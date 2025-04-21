@@ -2,88 +2,137 @@
 
 import { useEffect, useState } from "react";
 
-export default function Home() {
-  const [advocates, setAdvocates] = useState([]);
-  const [filteredAdvocates, setFilteredAdvocates] = useState([]);
+interface Advocate {
+  id: string; // react key
+  firstName: string;
+  lastName: string;
+  city: string;
+  degree: string;
+  specialties: string[];
+  yearsOfExperience: number;
+  phoneNumber: string;
+}
 
+export default function Home() {
+  /* ------------------------------------------------------------------
+   * STATE
+   * ----------------------------------------------------------------*/
+  const [advocates, setAdvocates] = useState<Advocate[]>([]);
+  const [filteredAdvocates, setFilteredAdvocates] = useState<Advocate[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  /* ------------------------------------------------------------------
+   * DATA‑FETCHING
+   * ----------------------------------------------------------------*/
   useEffect(() => {
-    console.log("fetching advocates...");
-    fetch("/api/advocates").then((response) => {
-      response.json().then((jsonResponse) => {
+    console.log("fetching advocates…");
+    const controller = new AbortController();
+
+    fetch("/api/advocates", { signal: controller.signal })
+      .then((response) => response.json())
+      .then((jsonResponse) => {
         setAdvocates(jsonResponse.data);
         setFilteredAdvocates(jsonResponse.data);
-      });
-    });
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") {
+          setError(err.message);
+        }
+      })
+      .finally(() => setLoading(false));
+
+    // Abort fetch if the component unmounts
+    return () => controller.abort();
   }, []);
 
-  const onChange = (e) => {
-    const searchTerm = e.target.value;
+  /* ------------------------------------------------------------------
+   * SEARCH FILTERING
+   * ----------------------------------------------------------------*/
+  useEffect(() => {
+    if (!searchTerm) {
+      setFilteredAdvocates(advocates);
+      return;
+    }
 
-    document.getElementById("search-term").innerHTML = searchTerm;
+    const term = searchTerm.toLowerCase();
 
-    console.log("filtering advocates...");
-    const filteredAdvocates = advocates.filter((advocate) => {
-      return (
-        advocate.firstName.includes(searchTerm) ||
-        advocate.lastName.includes(searchTerm) ||
-        advocate.city.includes(searchTerm) ||
-        advocate.degree.includes(searchTerm) ||
-        advocate.specialties.includes(searchTerm) ||
-        advocate.yearsOfExperience.includes(searchTerm)
-      );
+    const result = advocates.filter((advocates) => {
+      const searchableContent = [
+      advocates.firstName,
+      advocates.lastName,
+      advocates.city,
+      advocates.degree,
+      advocates.yearsOfExperience.toString(),
+      ...(advocates.specialties),
+      ]
+      .join(" ")
+      .toLowerCase();
+
+      return searchableContent.includes(term);
     });
 
-    setFilteredAdvocates(filteredAdvocates);
-  };
+    setFilteredAdvocates(result);
+  }, [searchTerm, advocates]);
 
-  const onClick = () => {
-    console.log(advocates);
-    setFilteredAdvocates(advocates);
-  };
+  /* ------------------------------------------------------------------
+   * RENDER
+   * ----------------------------------------------------------------*/
+  if (loading) return <p style={{ margin: "24px" }}>Loading…</p>;
+  if (error) return <p style={{ margin: "24px", color: "red" }}>{error}</p>;
 
   return (
     <main style={{ margin: "24px" }}>
       <h1>Solace Advocates</h1>
-      <br />
-      <br />
-      <div>
-        <p>Search</p>
-        <p>
-          Searching for: <span id="search-term"></span>
-        </p>
-        <input style={{ border: "1px solid black" }} onChange={onChange} />
-        <button onClick={onClick}>Reset Search</button>
+
+      {/* -------------------- Search UI -------------------- */}
+      <div style={{ margin: "16px 0" }}>
+        <label>
+          Search
+          <input
+            style={{ border: "1px solid black", marginLeft: 8 }}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </label>
+        {searchTerm && (
+          <button onClick={() => setSearchTerm("")}
+            style={{ marginLeft: 8 }}>
+            Reset
+          </button>
+        )}
       </div>
-      <br />
-      <br />
+
+      {/* -------------------- Data Table -------------------- */}
       <table>
         <thead>
-          <th>First Name</th>
-          <th>Last Name</th>
-          <th>City</th>
-          <th>Degree</th>
-          <th>Specialties</th>
-          <th>Years of Experience</th>
-          <th>Phone Number</th>
+          <tr>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>City</th>
+            <th>Degree</th>
+            <th>Specialties</th>
+            <th>Years of Experience</th>
+            <th>Phone Number</th>
+          </tr>
         </thead>
         <tbody>
-          {filteredAdvocates.map((advocate) => {
-            return (
-              <tr>
-                <td>{advocate.firstName}</td>
-                <td>{advocate.lastName}</td>
-                <td>{advocate.city}</td>
-                <td>{advocate.degree}</td>
-                <td>
-                  {advocate.specialties.map((s) => (
-                    <div>{s}</div>
-                  ))}
-                </td>
-                <td>{advocate.yearsOfExperience}</td>
-                <td>{advocate.phoneNumber}</td>
-              </tr>
-            );
-          })}
+          {filteredAdvocates.map((advocate) => (
+            <tr key={advocate.id}>
+              <td>{advocate.firstName}</td>
+              <td>{advocate.lastName}</td>
+              <td>{advocate.city}</td>
+              <td>{advocate.degree}</td>
+              <td>
+                {advocate.specialties.map((s) => (
+                  <div key={s}>{s}</div>
+                ))}
+              </td>
+              <td>{advocate.yearsOfExperience}</td>
+              <td>{advocate.phoneNumber}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </main>
