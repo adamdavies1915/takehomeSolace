@@ -47,10 +47,16 @@ export default function Home() {
     const controller = new AbortController();
 
     fetch("/api/advocates", { signal: controller.signal })
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) {
+          setError(`Error: ${response.status} ${response.statusText}`);
+          return { data: [] };
+        }
+        return response.json();
+      })
       .then((jsonResponse) => {
-        setAdvocates(jsonResponse.data);
-        setFilteredAdvocates(jsonResponse.data);
+        setAdvocates(jsonResponse.data || []);
+        setFilteredAdvocates(jsonResponse.data || []);
       })
       .catch((err) => {
         if (err.name !== "AbortError") setError(err.message);
@@ -64,10 +70,10 @@ export default function Home() {
    * SPECIALTY OPTIONS EXTRACTION
    * ----------------------------------------------------------------*/
   useEffect(() => {
-    if (advocates.length > 0) {
+    if (advocates && advocates.length > 0) {
       const uniqueSpecialties = Array.from(
         new Set(
-          advocates.flatMap((adv) => adv.specialties)
+          advocates.flatMap((adv) => adv.specialties || [])
         )
       ).sort();
       setSpecialtyOptions(uniqueSpecialties);
@@ -126,6 +132,8 @@ export default function Home() {
    * SEARCH FILTERING
    * ----------------------------------------------------------------*/
   useEffect(() => {
+    if (!advocates || advocates.length === 0) return;
+    
     let result = [...advocates];
 
     // Apply filters one by one
@@ -161,7 +169,7 @@ export default function Home() {
       result = result.filter((adv) => 
         // Return advocates that have ANY of the selected specialties
         filters.specialties.some(specialty => 
-          adv.specialties.includes(specialty)
+          adv.specialties && adv.specialties.includes(specialty)
         )
       );
     }
@@ -331,7 +339,7 @@ export default function Home() {
 
         {/* -------------------- Results Count -------------------- */}
         <div className="mb-4 text-gray-700 dark:text-gray-300">
-          Showing {filteredAdvocates.length} of {advocates.length} advocates
+          Showing {filteredAdvocates?.length} of {advocates?.length} advocates
         </div>
 
         {/* -------------------- Data Table -------------------- */}
@@ -363,7 +371,7 @@ export default function Home() {
               </tr>
             </thead>
             <tbody>
-              {filteredAdvocates.length > 0 ? (
+              {filteredAdvocates && filteredAdvocates.length > 0 ? (
                 filteredAdvocates.map((adv, idx) => (
                   <tr
                     key={adv.id}
@@ -383,7 +391,7 @@ export default function Home() {
                     <td className="px-6 py-4">{adv.city}</td>
                     <td className="px-6 py-4">{adv.degree}</td>
                     <td className="px-6 py-4 space-y-1">
-                      {adv.specialties.map((s) => (
+                      {adv.specialties && adv.specialties.map((s) => (
                         <div key={s}>{s}</div>
                       ))}
                     </td>
